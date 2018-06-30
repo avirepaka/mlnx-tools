@@ -12,8 +12,10 @@ TRUST_MODE=dscp
 CC_FLAG=1
 DEFAULT_TOS=32
 TOS_MAP=32,32,64,96,128,160,192,192
+PFC_CONFIG=""
+DEFAULT_PFC_CONFIG=0,1,1,1,1,1,1,0
 MAJOR_VERSION=1
-MINOR_VERSION=3
+MINOR_VERSION=4
 
 echo ""
 
@@ -32,6 +34,8 @@ Options:
 
  -Q <tos_map_list>      set the tos_map_N values according to the comma-seperated list
                         specified in the argument <tos_map_list>
+
+ -p <pfc_string>	enable/disable the PFC for each priority lane(default: $DEFAULT_PFC_CONFIG)
 
 Example:
 	roce_config -i eth4 -d 0 -t pcp
@@ -92,6 +96,20 @@ config_trust_mode() {
 		exit 1
 	else
 		echo " + Trust mode is set to $TRUST_MODE"
+	fi
+}
+
+config_pfc() {
+	if [[ $PFC_CONFIG == "" ]] ; then
+		PFC_CONFIG=$DEFAULT_PFC_CONFIG;
+	fi
+
+	mlnx_qos -i $NETDEV --pfc=$PFC_CONFIG > /dev/null
+	if [[ $? != 0 ]] ; then
+		>&2 echo " - Configuring PFC failed"
+		exit 1
+	else
+		echo " + PFC is configured as $PFC_CONFIG"
 	fi
 }
 
@@ -168,6 +186,9 @@ case $1 in
 		;;
 	-Q )	shift
 		TOS_MAP=$1
+		;;
+	-p )	shift
+		PFC_CONFIG=$1
 		;;
 	-v )	print_version
 		exit
@@ -254,6 +275,7 @@ set_rocev2_default
 set_tos_mapping
 set_default_tos
 config_trust_mode
+config_pfc
 
 PCI_ADDR="$(ethtool -i $NETDEV | grep "bus-info" | cut -f 2 -d " ")"
 if [ -z "$PCI_ADDR" ] ; then
